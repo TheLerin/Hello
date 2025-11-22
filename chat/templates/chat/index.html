@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Hello - Django Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root{
+            --primary-purple:#8b5cf6;--deep-purple:#6d28d9;--accent-purple:#a78bfa;
+            --dark-bg:#0a0a0f;--card-bg:rgba(20,20,30,0.7);--glass-bg:rgba(30,30,45,0.6);
+            --sent-msg:rgba(139,92,246,0.3);--received-msg:rgba(50,50,70,0.5);
+            --text-light:#e5e7eb;--text-muted:#9ca3af;--text-purple:#c4b5fd;
+            --shadow:0 8px 32px rgba(139,92,246,.15);--glow:0 0 20px rgba(139,92,246,.3)
+        }
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Helvetica,Arial,sans-serif}
+        body{
+            background:linear-gradient(135deg,#0a0a0f 0%,#1a0b2e 50%,#16031e 100%);
+            height:100vh;display:flex;justify-content:center;align-items:center;padding:20px;
+            position:relative;overflow:hidden;
+        }
+        body::before{
+            content:'';position:absolute;width:500px;height:500px;
+            background:radial-gradient(circle,rgba(139,92,246,0.15),transparent 70%);
+            top:-200px;right:-200px;border-radius:50%;filter:blur(80px);
+        }
+        body::after{
+            content:'';position:absolute;width:600px;height:600px;
+            background:radial-gradient(circle,rgba(109,40,217,0.1),transparent 70%);
+            bottom:-250px;left:-250px;border-radius:50%;filter:blur(100px);
+        }
+        .app-container{
+            width:100%;max-width:1400px;height:95vh;
+            background:rgba(15,15,25,0.4);
+            backdrop-filter:blur(20px);
+            display:flex;
+            box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 1px rgba(139,92,246,.3);
+            border-radius:20px;overflow:hidden;
+            border:1px solid rgba(139,92,246,0.1);
+            position:relative;z-index:1;
+        }
+        .sidebar{
+            width:30%;
+            background:rgba(20,20,30,0.5);
+            backdrop-filter:blur(15px);
+            border-right:1px solid rgba(139,92,246,0.15);
+            display:flex;flex-direction:column;
+        }
+        .sidebar-header{
+            padding:15px;
+            background:rgba(30,30,45,0.6);
+            backdrop-filter:blur(10px);
+            display:flex;align-items:center;justify-content:space-between;
+            border-bottom:1px solid rgba(139,92,246,0.1);
+        }
+        .user-profile{display:flex;align-items:center;gap:10px}
+        .avatar{
+            width:40px;height:40px;border-radius:50%;
+            background:linear-gradient(135deg,var(--primary-purple),var(--deep-purple));
+            color:#fff;display:flex;align-items:center;justify-content:center;
+            font-weight:bold;box-shadow:var(--glow);
+        }
+        .user-info h3{font-size:16px;color:var(--text-light)}
+        .user-info p{font-size:13px;color:var(--text-muted)}
+        .sidebar-icons{display:flex;gap:20px;color:var(--text-muted)}
+        .sidebar-icons i{cursor:pointer;transition:color .3s}
+        .sidebar-icons i:hover{color:var(--primary-purple)}
+        .search-container{padding:10px 15px;background:transparent}
+        .search-box{
+            display:flex;align-items:center;
+            background:rgba(40,40,60,0.5);
+            backdrop-filter:blur(10px);
+            border-radius:20px;padding:8px 15px;
+            border:1px solid rgba(139,92,246,0.2);
+            transition:all .3s;
+        }
+        .search-box:focus-within{
+            border-color:var(--primary-purple);
+            box-shadow:0 0 15px rgba(139,92,246,.2);
+        }
+        .search-box i{color:var(--text-muted);margin-right:10px}
+        .search-box input{
+            border:none;outline:none;width:100%;font-size:14px;
+            background:transparent;color:var(--text-light);
+        }
+        .search-box input::placeholder{color:var(--text-muted)}
+        .contacts{flex:1;overflow-y:auto}
+        .contacts::-webkit-scrollbar{width:6px}
+        .contacts::-webkit-scrollbar-track{background:transparent}
+        .contacts::-webkit-scrollbar-thumb{background:rgba(139,92,246,0.3);border-radius:10px}
+        .contact{
+            display:flex;align-items:center;padding:15px;cursor:pointer;
+            border-bottom:1px solid rgba(139,92,246,0.05);
+            transition:all .3s;
+        }
+        .contact:hover{background:rgba(139,92,246,0.1)}
+        .contact.active{
+            background:rgba(139,92,246,0.15);
+            border-left:3px solid var(--primary-purple);
+        }
+        .contact-avatar{
+            width:50px;height:50px;border-radius:50%;
+            background:linear-gradient(135deg,var(--accent-purple),var(--primary-purple));
+            color:#fff;display:flex;align-items:center;justify-content:center;
+            font-weight:bold;margin-right:15px;
+        }
+        .contact-info{flex:1}
+        .contact-info h4{font-size:16px;color:var(--text-light);margin-bottom:5px}
+        .contact-info p{
+            font-size:14px;color:var(--text-muted);
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+        }
+        .contact-meta{text-align:right;font-size:12px;color:var(--text-muted)}
+        .chat-area{
+            flex:1;display:flex;flex-direction:column;
+            background:linear-gradient(180deg,rgba(10,10,20,0.3),rgba(20,10,30,0.4));
+            position:relative;
+        }
+        .chat-area::before{
+            content:'';position:absolute;inset:0;
+            background-image:url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%238b5cf6' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+            opacity:0.5;
+        }
+        .chat-header{
+            padding:15px;
+            background:rgba(30,30,45,0.7);
+            backdrop-filter:blur(15px);
+            display:flex;align-items:center;justify-content:space-between;
+            box-shadow:0 4px 20px rgba(0,0,0,.3);
+            border-bottom:1px solid rgba(139,92,246,0.1);
+            position:relative;z-index:2;
+        }
+        .chat-contact{display:flex;align-items:center;gap:15px}
+        .chat-contact-avatar{
+            width:45px;height:45px;border-radius:50%;
+            background:linear-gradient(135deg,var(--primary-purple),var(--deep-purple));
+            color:#fff;display:flex;align-items:center;justify-content:center;
+            font-weight:bold;box-shadow:var(--glow);
+        }
+        .chat-contact-info h3{font-size:16px;color:var(--text-light)}
+        .chat-contact-info p{font-size:13px;color:var(--text-muted)}
+        .chat-actions{display:flex;gap:20px;color:var(--text-muted)}
+        .chat-actions i{cursor:pointer;transition:color .3s}
+        .chat-actions i:hover{color:var(--primary-purple)}
+        .messages-container{
+            flex:1;padding:20px;overflow-y:auto;
+            display:flex;flex-direction:column;position:relative;z-index:1;
+        }
+        .messages-container::-webkit-scrollbar{width:8px}
+        .messages-container::-webkit-scrollbar-track{background:transparent}
+        .messages-container::-webkit-scrollbar-thumb{
+            background:rgba(139,92,246,0.3);border-radius:10px;
+        }
+        .message{
+            max-width:65%;padding:10px 15px;margin-bottom:15px;
+            border-radius:12px;position:relative;word-wrap:break-word;
+            backdrop-filter:blur(10px);
+            box-shadow:0 4px 15px rgba(0,0,0,.2);
+            border:1px solid rgba(139,92,246,0.1);
+        }
+        .sent{
+            align-self:flex-end;
+            background:linear-gradient(135deg,rgba(139,92,246,0.4),rgba(109,40,217,0.3));
+            border-top-right-radius:4px;
+            border:1px solid rgba(139,92,246,0.3);
+        }
+        .received{
+            align-self:flex-start;
+            background:rgba(40,40,60,0.6);
+            border-top-left-radius:4px;
+        }
+        .message-text{color:var(--text-light);line-height:1.5}
+        .message-time{
+            font-size:11px;color:var(--text-muted);
+            text-align:right;margin-top:5px;
+        }
+        .message-input-container{
+            padding:15px;
+            background:rgba(30,30,45,0.7);
+            backdrop-filter:blur(15px);
+            display:flex;align-items:center;gap:15px;
+            border-top:1px solid rgba(139,92,246,0.1);
+            position:relative;z-index:2;
+        }
+        .message-input{
+            flex:1;padding:12px 20px;
+            border:1px solid rgba(139,92,246,0.2);
+            border-radius:25px;outline:none;font-size:15px;
+            background:rgba(40,40,60,0.5);
+            backdrop-filter:blur(10px);
+            color:var(--text-light);
+            transition:all .3s;
+        }
+        .message-input::placeholder{color:var(--text-muted)}
+        .message-input:focus{
+            border-color:var(--primary-purple);
+            box-shadow:0 0 15px rgba(139,92,246,.2);
+        }
+        .input-actions{display:flex;gap:15px;color:var(--text-muted)}
+        .input-actions i{cursor:pointer;transition:color .3s}
+        .input-actions i:hover{color:var(--primary-purple)}
+        .send-button{
+            background:linear-gradient(135deg,var(--primary-purple),var(--deep-purple));
+            color:#fff;border:none;width:45px;height:45px;
+            border-radius:50%;display:flex;align-items:center;
+            justify-content:center;cursor:pointer;
+            box-shadow:var(--glow);
+            transition:transform .3s,box-shadow .3s;
+        }
+        .send-button:hover{
+            transform:scale(1.05);
+            box-shadow:0 0 25px rgba(139,92,246,.5);
+        }
+        .login-screen{
+            position:absolute;top:0;left:0;width:100%;height:100%;
+            background:linear-gradient(135deg,rgba(10,10,20,0.95),rgba(26,11,46,0.95));
+            backdrop-filter:blur(20px);
+            display:flex;flex-direction:column;justify-content:center;
+            align-items:center;z-index:100;color:#fff;text-align:center;
+            padding:20px;transition:transform .5s ease;
+        }
+        .login-screen::before{
+            content:'';position:absolute;inset:0;
+            background:radial-gradient(circle at 50% 50%,rgba(139,92,246,0.1),transparent 70%);
+            animation:pulse 4s ease-in-out infinite;
+        }
+        @keyframes pulse{
+            0%,100%{opacity:.5;transform:scale(1)}
+            50%{opacity:.8;transform:scale(1.1)}
+        }
+        .login-screen.hidden{transform:translateY(-100%)}
+        .login-logo{
+            font-size:50px;margin-bottom:20px;
+            color:var(--primary-purple);
+            text-shadow:0 0 30px rgba(139,92,246,.5);
+            position:relative;z-index:1;
+        }
+        .login-title{
+            font-size:28px;margin-bottom:10px;
+            position:relative;z-index:1;
+        }
+        .login-subtitle{
+            font-size:16px;margin-bottom:30px;
+            opacity:.8;color:var(--text-purple);
+            position:relative;z-index:1;
+        }
+        .login-form{width:100%;max-width:400px;position:relative;z-index:1}
+        .form-group{margin-bottom:20px;text-align:left}
+        .form-group label{
+            display:block;margin-bottom:8px;font-size:14px;
+            color:var(--text-purple);
+        }
+        .form-group input{
+            width:100%;padding:12px 15px;
+            border:1px solid rgba(139,92,246,0.3);
+            border-radius:10px;font-size:16px;
+            background:rgba(40,40,60,0.5);
+            backdrop-filter:blur(10px);
+            color:var(--text-light);
+            transition:all .3s;
+        }
+        .form-group input::placeholder{color:var(--text-muted)}
+        .form-group input:focus{
+            outline:none;
+            border-color:var(--primary-purple);
+            box-shadow:0 0 20px rgba(139,92,246,.3);
+        }
+        .start-chat-btn{
+            background:linear-gradient(135deg,var(--primary-purple),var(--deep-purple));
+            color:#fff;border:none;padding:12px 30px;
+            border-radius:25px;font-size:16px;cursor:pointer;
+            transition:all .3s;
+            box-shadow:0 0 20px rgba(139,92,246,.4);
+        }
+        .start-chat-btn:hover{
+            transform:translateY(-2px);
+            box-shadow:0 0 30px rgba(139,92,246,.6);
+        }
+        @media (max-width:768px){
+            .app-container{height:100vh;border-radius:0}
+            .sidebar{width:100%}
+            .chat-area{display:none}
+            .chat-area.active{display:flex}
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-logo"><i class="fab fa-whatsapp"></i></div>
+        <h1 class="login-title">Hello Chat</h1>
+        <p class="login-subtitle">Simple Django Chat App</p>
+        <div class="login-form">
+            <div class="form-group">
+                <label for="userName">Your Name</label>
+                <input type="text" id="userName" placeholder="Enter your name">
+            </div>
+            <div class="form-group">
+                <label for="friendName">Friend's Name</label>
+                <input type="text" id="friendName" placeholder="Enter friend's name">
+            </div>
+            <button class="start-chat-btn" onclick="startChat()">Start Chatting</button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="user-profile">
+                    <div class="avatar" id="userAvatarDisplay">U</div>
+                    <div class="user-info">
+                        <h3 id="userNameDisplay">User</h3>
+                        <p id="presenceText">Online</p>
+                    </div>
+                </div>
+                <div class="sidebar-icons">
+                    <i class="fas fa-circle-notch"></i>
+                    <i class="fas fa-comment"></i>
+                    <i class="fas fa-ellipsis-v"></i>
+                </div>
+            </div>
+
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search or start new chat">
+                </div>
+            </div>
+
+            <div class="contacts" id="contactsList"></div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area" id="chatArea">
+            <div class="chat-header">
+                <div class="chat-contact">
+                    <div class="chat-contact-avatar" id="chatContactAvatar">F</div>
+                    <div class="chat-contact-info">
+                        <h3 id="chatContactName">Friend</h3>
+                        <p>Online</p>
+                    </div>
+                </div>
+                <div class="chat-actions">
+                    <i class="fas fa-search"></i>
+                    <i class="fas fa-paperclip"></i>
+                    <i class="fas fa-ellipsis-v"></i>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messagesContainer"></div>
+
+            <div class="message-input-container">
+                <div class="input-actions">
+                    <i class="far fa-smile"></i>
+                    <i class="fas fa-paperclip"></i>
+                </div>
+                <input type="text" class="message-input" id="messageInput" placeholder="Type a message">
+                <div class="send-button" id="sendBtn">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+let currentUser = null;
+let currentPeer = null;
+let pollingTimer = null;
+
+function formatTime(isoOrDate){
+    const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
+    const hh = d.getHours();
+    const mm = d.getMinutes().toString().padStart(2,'0');
+    return `${hh}:${mm}`;
+}
+
+function startChat(){
+    const name = document.getElementById('userName').value.trim();
+    const friend = document.getElementById('friendName').value.trim();
+    
+    if(!name || !friend){
+        alert('Please enter both your name and friend\'s name');
+        return;
+    }
+    
+    currentUser = name;
+    currentPeer = friend;
+    
+    document.getElementById('userNameDisplay').textContent = name;
+    document.getElementById('userAvatarDisplay').textContent = name[0].toUpperCase();
+    document.getElementById('presenceText').textContent = 'Online';
+    document.getElementById('chatContactName').textContent = friend;
+    document.getElementById('chatContactAvatar').textContent = friend[0].toUpperCase();
+    document.getElementById('loginScreen').classList.add('hidden');
+    
+    // Create contact in sidebar
+    const contactsList = document.getElementById('contactsList');
+    contactsList.innerHTML = `
+        <div class="contact active">
+            <div class="contact-avatar">${friend[0].toUpperCase()}</div>
+            <div class="contact-info">
+                <h4>${friend}</h4>
+                <p>Click to chat</p>
+            </div>
+            <div class="contact-meta">Now</div>
+        </div>
+    `;
+    
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    document.getElementById('messageInput').addEventListener('keypress', (e)=>{
+        if(e.key === 'Enter') sendMessage();
+    });
+    
+    loadMessages();
+    pollingTimer = setInterval(loadMessages, 2000);
+}
+
+function renderMessages(list){
+    const box = document.getElementById('messagesContainer');
+    box.innerHTML = '';
+    list.forEach(m => {
+        const isMine = (m.sender === currentUser);
+        const wrap = document.createElement('div');
+        wrap.className = 'message ' + (isMine ? 'sent' : 'received');
+
+        const text = document.createElement('div');
+        text.className = 'message-text';
+        text.textContent = m.text;
+
+        const time = document.createElement('div');
+        time.className = 'message-time';
+        time.textContent = m.time || formatTime(new Date());
+
+        wrap.appendChild(text);
+        wrap.appendChild(time);
+        box.appendChild(wrap);
+    });
+    box.scrollTop = box.scrollHeight;
+}
+
+async function loadMessages(){
+    if(!currentUser || !currentPeer) return;
+    try{
+        const params = new URLSearchParams({ user: currentUser, friend: currentPeer });
+        const res = await fetch(`/get/?${params.toString()}`, { cache: 'no-store' });
+        if(!res.ok) return;
+        const data = await res.json();
+        renderMessages(data.messages || []);
+    }catch(e){
+        console.log('Error loading messages:', e);
+    }
+}
+
+async function sendMessage(){
+    const input = document.getElementById('messageInput');
+    const text = input.value.trim();
+    if(!text || !currentUser || !currentPeer) return;
+    try{
+        const params = new URLSearchParams({
+            sender: currentUser,
+            receiver: currentPeer,
+            text: text
+        });
+        const res = await fetch(`/send/?${params.toString()}`);
+        if(res.ok){
+            input.value = '';
+            await loadMessages();
+        }
+    }catch(e){
+        console.log('Error sending message:', e);
+    }
+}
+
+(function initFromQuery(){
+    const url = new URL(window.location.href);
+    const u = url.searchParams.get('user');
+    const f = url.searchParams.get('friend');
+    if(u) document.getElementById('userName').value = u;
+    if(f) document.getElementById('friendName').value = f;
+})();
+</script>
+</body>
+</html>
